@@ -1,0 +1,179 @@
+
+import { Phone } from "lucide-react";
+import { Link } from "react-router-dom";
+import {useEffect, useState} from "react";
+import api from '../../services/api'
+import { recentCalls as sampleRecentCalls } from "../../data/followups/RecentCalls";
+
+const RecentCalls = () => {
+
+  const [callMessage, setCallMessage] = useState("");
+  const [recentCalls, setRecentCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showingSampleCalls, setShowingSampleCalls] = useState(false);
+
+  useEffect(()=>{
+    const fetchCalls = async () =>{
+      try{
+        const response = await api.get('/calls');
+        const calls = (response.data.calls || []).slice(0, 5).map((call)=>({
+          id:call._id,
+          name:call.contact?.name || "Unknown Contact",
+          agent:call.agent?.name || "Unknown",
+          duration: `${Math.floor((call.duration || 0)/60)}m${(call.duration || 0)%60}s`,
+          status: call.status === "Completed" ? "Connected" 
+          : call.status === "Missed" ? "Missed" : "No Answer",
+          initials:(call.contact?.name || "UC")
+          .split(" ")
+          .map((part)=>part[0])
+          .join("")
+          .slice(0,2)
+          .toUpperCase(),
+          avatarColor:"bg-blue-600",
+        }));
+        setShowingSampleCalls(calls.length === 0);
+        setRecentCalls(calls.length > 0 ? calls : sampleRecentCalls.slice(0, 5));
+      }catch(error){
+        console.error("Failed to load recent calls:",error);
+        setShowingSampleCalls(true);
+        setRecentCalls(sampleRecentCalls.slice(0, 5));
+      }finally{
+        setLoading(false)
+      }
+    };
+    fetchCalls();
+  },[])
+
+
+
+
+  const statusStyles = {
+    Connected: "bg-emerald-50 text-emerald-700",
+    Missed: "bg-red-50 text-red-600",
+    "No Answer": "bg-blue-50 text-blue-700",
+  };
+
+  const statusDots = {
+    Connected: "bg-emerald-600",
+    Missed: "bg-red-500",
+    "No Answer": "bg-blue-400",
+  };
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+      {/* Header */}
+      <div className="flex h-[46px] items-center justify-between border-b border-slate-100 px-3">
+        <div className="flex items-center gap-2">
+          <Phone size={18} className="text-blue-700" />
+          <h2 className="text-[15px] font-bold text-[#102F69]">
+            Recent Calls
+          </h2>
+          {showingSampleCalls && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              Sample data
+            </span>
+          )}
+        </div>
+
+        <Link
+          to="/call-history"
+          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+        >
+          View All
+        </Link>
+      </div>
+
+      {/* 🟢 NEW: Compact calls table */}
+      <div className="w-full overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-left">
+          <thead>
+            <tr className="h-[34px] bg-blue-50/80 text-[10px] font-semibold text-[#18396F] sm:text-[11px]">
+              <th className="w-[35%] px-2 sm:px-3">Lead</th>
+              <th className="w-[15%] px-1">Agent</th>
+              <th className="w-[15%] px-1">Duration</th>
+              <th className="w-[23%] px-1">Status</th>
+              <th className="w-[12%] px-1">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  role="status"
+                  className="h-[190px] border-t border-slate-100 text-center text-sm text-slate-500"
+                >
+                  Loading recent calls...
+                </td>
+              </tr>
+            ) : recentCalls.map((call) => (
+              <tr
+                key={call.id}
+                className="h-[38px] border-t border-slate-100 text-[10px] text-[#18396F] sm:text-[11px]"
+              >
+                {/* Lead */}
+                <td className="px-2 sm:px-3">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white ${call.avatarColor}`}
+                    >
+                      {call.initials}
+                    </span>
+                    <span className="truncate font-medium">
+                      {call.name}
+                    </span>
+                  </div>
+                </td>
+
+                {/* Agent */}
+                <td className="truncate px-1">{call.agent}</td>
+
+                {/* Duration */}
+                <td className="whitespace-nowrap px-1">{call.duration}</td>
+
+                {/* Status */}
+                <td className="px-1">
+                  <span
+                    className={`inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-1 text-[9px] font-medium sm:gap-1.5 sm:px-2 sm:text-[10px] ${statusStyles[call.status]}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDots[call.status]}`}
+                    />
+                    <span className="truncate">{call.status}</span>
+                  </span>
+                </td>
+
+                {/* Action */}
+                <td className="px-1">
+                  {call.status === "Connected" ? (
+                    <Link
+                      to="/call-history"
+                      className="font-medium text-blue-700 underline underline-offset-2"
+                    >
+                      View
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCallMessage(`calling is not config yet for ${call.name}`)}
+                      className="font-medium text-blue-700 underline underline-offset-2"
+                    >Call</button>)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {callMessage && (
+        <div role="status" className="border-t border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          {callMessage}
+        </div>
+      )}
+
+
+    </section>
+  );
+};
+
+export default RecentCalls;
